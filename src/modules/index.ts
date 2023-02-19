@@ -1,7 +1,7 @@
 import express from "express";
 
-import { authRouter } from "./auth";
+import { filmsRouter } from "./films";
 
 export const services = express.Router();
 
-services.use("/auth", authRouter);
+services.use("/films", filmsRouter);

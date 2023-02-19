@@ -1,7 +1,4 @@
 {
-  "engines": {
-    "node": "14.x"
-  },
   "name": "omdb-api",
   "version": "1.0.0",
   "author": "",
@@ -12,7 +9,7 @@
   "repository": "",
   "scripts": {
     "build": "tsc",
-    "dev": "nodemon --watch 'src/**/*.ts' --exec 'yarn start'",
+    "dev": "nodemon src/index.ts",
     "heroku": "node ./dist/src",
     "start": "ts-node src"
   },
@@ -33,6 +30,7 @@
     "express-fileupload": "^1.4.0",
     "express-jwt": "^6.0.0",
     "fs": "^0.0.1-security",
+    "googleapis": "^111.0.0",
     "joi": "^17.6.0",
     "jsonpath": "^1.1.1",
     "jsonwebtoken": "^8.5.1",

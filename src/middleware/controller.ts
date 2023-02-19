@@ -1,6 +1,5 @@
 import { NextFunction, Request, Response } from "express";
-import jwt, { TokenExpiredError } from "jsonwebtoken";
-import { ACCESS_TOKEN_SECRET } from "../const";
+import { ACCESS_TOKEN, HttpStatusCode } from "../const";
 
 export const auth = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -9,30 +8,23 @@ export const auth = async (req: Request, res: Response, next: NextFunction) => {
       const regex = /Bearer (.+)/i;
       token = req.headers["authorization"].match(regex)?.[1];
     } else {
-      return res.status(403).json({
+      return res.status(HttpStatusCode.FORBIDDEN).json({
         message: "Authorization token is invalid or it is not provided.",
       });
     }
 
-    jwt.verify(token, ACCESS_TOKEN_SECRET, async (err, decoded: any) => {
-      if (err) {
-        if (err instanceof TokenExpiredError) {
-          return res
-            .status(401)
-            .send({ message: "Unauthorized! Access Token was expired!" });
-        } else {
-          res.status(401).json({ message: "Unauthorized!" });
-        }
-      } else {
-        req.headers.userId = decoded.userId;
-        next();
-      }
-    });
+    if (token == ACCESS_TOKEN) {
+      next();
+    } else {
+      return res.status(HttpStatusCode.UNAUTHORIZED).json({
+        message: "Authorization token is invalid or it is not provided.",
+      });
+    }
   } catch (e) {
     console.log(e);
 
-    return res.status(404).json({
-      message: "User not found",
+    return res.status(HttpStatusCode.INTERNAL_SERVER).json({
+      message: "Internal server error.",
     });
   }
 };
