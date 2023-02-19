@@ -1,35 +1,44 @@
 import { NextFunction, Request, Response } from "express";
 import fetch from "node-fetch";
 import { HttpStatusCode, OMDB_URL } from "../../const";
+import { Movie } from "../../models/movie.modal";
 import { SpreadSheet } from "../../models/spreadsheet.model";
-import { addRowToSheet, checkActorInList, getCommonActors } from "./service";
+import {
+  addRowToSheet,
+  checkActorInList,
+  getCommonActors,
+  getMovieDetail,
+  getMovieIds,
+} from "./service";
 
-export const getFilmsByTitle = async (
+export const getFilmsBySearch = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
-  let { title, page } = req.body;
+  let { title } = req.body;
   if (!title) {
     title = "Fast %26 Furious";
   }
   try {
-    const response = await fetch(`${OMDB_URL}&s=${title}&page=${page}`, {
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+    let page = 1;
+    let PAGE_SIZE = 100;
+    let moviePromises: Array<Promise<Movie>> = [];
+    do {
+      const data = await getMovieIds(title, page);
+      moviePromises.push(
+        ...data.ids.map((id) => {
+          return getMovieDetail(id);
+        })
+      );
+      PAGE_SIZE = data.pageCount;
+      page++;
+    } while (page < PAGE_SIZE);
 
-    if (response.ok) {
-      const data = await response.json();
-      return res.status(HttpStatusCode.SUCCESS).json({
-        data,
-      });
-    } else {
-      return res.status(HttpStatusCode.BAD_REQUEST).json({
-        message: "Failed to fetch films.",
-      });
-    }
+    const data = await Promise.all(moviePromises);
+    return res.status(HttpStatusCode.SUCCESS).json({
+      data,
+    });
   } catch (error: any) {
     if (error.message) {
       return res.status(HttpStatusCode.BAD_REQUEST).json({
@@ -55,48 +64,62 @@ export const spreadSheet = async (
   if (!actor) {
     actor = "Paul Walker";
   }
+
   try {
-    const response1 = await fetch(`${OMDB_URL}&t=${title1}`, {
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-    const response2 = await fetch(`${OMDB_URL}&t=${title2}`, {
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+    // Fetch all detail from first movies list
+    let page = 1;
+    let PAGE_SIZE = 100;
+    let moviePromises: Array<Promise<Movie>> = [];
+    do {
+      const data = await getMovieIds(title1, page);
+      moviePromises.push(
+        ...data.ids.map((id) => {
+          return getMovieDetail(id, true);
+        })
+      );
+      PAGE_SIZE = data.pageCount;
+      page++;
+    } while (page < PAGE_SIZE);
+    const data1 = await Promise.all(moviePromises);
 
-    if (response1.ok && response2.ok) {
-      const data1 = await response1.json();
-      const data2 = await response2.json();
+    // Fetch all actors from second movies list
+    page = 1;
+    PAGE_SIZE = 100;
+    moviePromises = [];
+    do {
+      const data = await getMovieIds(title1, page);
+      moviePromises.push(
+        ...data.ids.map((id) => {
+          return getMovieDetail(id, true);
+        })
+      );
+      PAGE_SIZE = data.pageCount;
+      page++;
+    } while (page < PAGE_SIZE);
+    const data2 = await Promise.all(moviePromises);
 
-      const wasProducedBefore2015 = Number(data1.Year) < 2015;
-      const actors1 = data1.Actors.split(",").map((value: string) => {
-        return value.trim();
-      });
-      const actors2 = data2.Actors.split(",").map((value: string) => {
-        return value.trim();
-      });
-      const wasPaulInActors = checkActorInList(actor, actors1);
-      const commonActors = getCommonActors(actors1, actors2);
-
-      const spreadSheetData: SpreadSheet = {
-        wasProducedBefore2015,
-        wasPaulInActors,
-        commonActors,
-      };
-
-      addRowToSheet(spreadSheetData);
-
-      return res.status(HttpStatusCode.SUCCESS).json({
-        data: spreadSheetData,
-      });
-    } else {
-      return res.status(HttpStatusCode.BAD_REQUEST).json({
-        message: "Failed to fetch films.",
-      });
+    const actors2: Array<string> = [];
+    for (let movie of data2) {
+      for (let actorName of movie.Actors) {
+        if (!actors2.includes(actorName)) {
+          actors2.push(actorName);
+        }
+      }
     }
+
+    for (let movie of data1) {
+      const spreadSheet: SpreadSheet = {
+        Title: movie.Title,
+        WasProducedBefore2015: Number(movie.Year) < 2015,
+        WasActorIn: checkActorInList(actor, movie.Actors),
+        CommonActors: getCommonActors(movie.Actors, actors2),
+      };
+      await addRowToSheet(spreadSheet);
+    }
+
+    return res.status(HttpStatusCode.SUCCESS).json({
+      data: data1,
+    });
   } catch (error: any) {
     if (error.message) {
       return res.status(HttpStatusCode.BAD_REQUEST).json({

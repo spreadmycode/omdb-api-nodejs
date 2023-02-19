@@ -1,5 +1,6 @@
 export interface SpreadSheet {
-  wasProducedBefore2015: boolean;
-  wasPaulInActors: boolean;
-  commonActors: string;
+  Title: string;
+  WasProducedBefore2015: boolean;
+  WasActorIn: boolean;
+  CommonActors: string;
 }

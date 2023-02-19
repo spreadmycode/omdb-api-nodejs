@@ -1,6 +1,12 @@
 import { google } from "googleapis";
 import { JWT } from "google-auth-library";
-import { GOOGLE_SERVICE_ACCOUNT_JSON_PATH, GOOGLE_SHEET_ID } from "../../const";
+import fetch from "node-fetch";
+import {
+  GOOGLE_SERVICE_ACCOUNT_JSON_PATH,
+  GOOGLE_SHEET_ID,
+  OMDB_URL,
+} from "../../const";
+import { Movie } from "../../models/movie.modal";
 
 export const checkActorInList = (name: string, actors: Array<string>) => {
   let exists = false;
@@ -19,17 +25,86 @@ export const getCommonActors = (
 ) => {
   const commonValues: string[] = [];
   for (const value of actors1) {
-    if (
-      actors2.includes(value.toLocaleLowerCase()) &&
-      !commonValues.includes(value.toLocaleLowerCase())
-    ) {
+    if (actors2.includes(value) && !commonValues.includes(value)) {
       commonValues.push(value);
     }
   }
   return commonValues.join(", ");
 };
 
-export const addRowToSheet = (data: any) => {
+export const getMovieIds = (search: string, page: number) => {
+  return new Promise<{ ids: Array<string>; pageCount: number }>(
+    (resolve, reject) => {
+      try {
+        fetch(`${OMDB_URL}&s=${search}&page=${page}&type=movie`, {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        })
+          .then((value) => {
+            value
+              .json()
+              .then((data) => {
+                resolve({
+                  ids: data.Search.map((item: any) => {
+                    return item.imdbID;
+                  }),
+                  pageCount: data.totalResults / 10 + 1,
+                });
+              })
+              .catch((error) => {
+                reject(error);
+              });
+          })
+          .catch((error) => {
+            reject(error);
+          });
+      } catch (e) {
+        console.log(e);
+      }
+    }
+  );
+};
+
+export const getMovieDetail = (id: string, fetchActors: boolean = false) => {
+  return new Promise<Movie>((resolve, reject) => {
+    try {
+      fetch(`${OMDB_URL}&i=${id}`, {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
+        .then((value) => {
+          value
+            .json()
+            .then((data) => {
+              const movie = {
+                Title: data.Title,
+                Director: data.Director,
+                Image: data.Poster,
+                Year: data.Year,
+              } as Movie;
+              if (fetchActors) {
+                movie.Actors = data.Actors.split(",").map((value: string) => {
+                  return value.trim();
+                });
+              }
+              resolve(movie);
+            })
+            .catch((error) => {
+              reject(error);
+            });
+        })
+        .catch((error) => {
+          reject(error);
+        });
+    } catch (e) {
+      console.log(e);
+    }
+  });
+};
+
+export const addRowToSheet = async (data: any) => {
   const auth = new JWT({
     keyFile: GOOGLE_SERVICE_ACCOUNT_JSON_PATH,
     scopes: [
@@ -42,13 +117,9 @@ export const addRowToSheet = (data: any) => {
   const range = `A1:A6`;
   const valueInputOption = "RAW";
   const requestBody = {
-    values: [
-      Object.keys(data).map((key) => {
-        return `${key}: ${data[key]}`;
-      }),
-    ],
+    values: [Object.values(data)],
   };
-  sheets.spreadsheets.values.append({
+  await sheets.spreadsheets.values.append({
     spreadsheetId: GOOGLE_SHEET_ID,
     range,
     valueInputOption,
