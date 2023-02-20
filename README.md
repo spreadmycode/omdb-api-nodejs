@@ -110,7 +110,8 @@ Common Actors: string
 Overview:
 
 ```
-Retrieve the list of searched movies and store the info of the specific movie in an online Google Spread Sheet.
+Retrieve the list of searched movies.
+Store the info of the specific movie in an online Google Spread Sheet.
 ```
 
 Please check this [Sheet](https://docs.google.com/spreadsheets/d/1lB_EqckkzdEfyLK6osJwstFv2L63aDziXIBxnlaKx-U/).
