@@ -1,6 +1,5 @@
 import { NextFunction, Request, Response } from "express";
-import fetch from "node-fetch";
-import { HttpStatusCode, OMDB_URL } from "../../const";
+import { HttpStatusCode } from "../../const";
 import { Movie } from "../../models/movie.modal";
 import { SpreadSheet } from "../../models/spreadsheet.model";
 import {
@@ -11,7 +10,27 @@ import {
   getMovieIds,
 } from "./service";
 
-export const getFilmsBySearch = async (
+const searchMoviePromises = async (search: string) => {
+  let page = 1;
+  let PAGE_SIZE = 100;
+  let moviePromises: Array<Promise<Movie>> = [];
+
+  // Make promise array for fetching each movie detail
+  do {
+    const data = await getMovieIds(search, page);
+    moviePromises.push(
+      ...data.ids.map((id) => {
+        return getMovieDetail(id);
+      })
+    );
+    PAGE_SIZE = data.pageCount;
+    page++;
+  } while (page < PAGE_SIZE);
+
+  return moviePromises;
+};
+
+export const getFilms = async (
   req: Request,
   res: Response,
   next: NextFunction
@@ -20,22 +39,11 @@ export const getFilmsBySearch = async (
   if (!title) {
     title = "Fast %26 Furious";
   }
-  try {
-    let page = 1;
-    let PAGE_SIZE = 100;
-    let moviePromises: Array<Promise<Movie>> = [];
-    do {
-      const data = await getMovieIds(title, page);
-      moviePromises.push(
-        ...data.ids.map((id) => {
-          return getMovieDetail(id);
-        })
-      );
-      PAGE_SIZE = data.pageCount;
-      page++;
-    } while (page < PAGE_SIZE);
 
+  try {
+    const moviePromises = await searchMoviePromises(title);
     const data = await Promise.all(moviePromises);
+
     return res.status(HttpStatusCode.SUCCESS).json({
       data,
     });
@@ -67,37 +75,12 @@ export const spreadSheet = async (
 
   try {
     // Fetch all detail from first movies list
-    let page = 1;
-    let PAGE_SIZE = 100;
-    let moviePromises: Array<Promise<Movie>> = [];
-    do {
-      const data = await getMovieIds(title1, page);
-      moviePromises.push(
-        ...data.ids.map((id) => {
-          return getMovieDetail(id, true);
-        })
-      );
-      PAGE_SIZE = data.pageCount;
-      page++;
-    } while (page < PAGE_SIZE);
+    let moviePromises = await searchMoviePromises(title1);
     const data1 = await Promise.all(moviePromises);
 
     // Fetch all actors from second movies list
-    page = 1;
-    PAGE_SIZE = 100;
-    moviePromises = [];
-    do {
-      const data = await getMovieIds(title1, page);
-      moviePromises.push(
-        ...data.ids.map((id) => {
-          return getMovieDetail(id, true);
-        })
-      );
-      PAGE_SIZE = data.pageCount;
-      page++;
-    } while (page < PAGE_SIZE);
+    moviePromises = await searchMoviePromises(title2);
     const data2 = await Promise.all(moviePromises);
-
     const actors2: Array<string> = [];
     for (let movie of data2) {
       for (let actorName of movie.Actors) {
@@ -107,6 +90,7 @@ export const spreadSheet = async (
       }
     }
 
+    // Get all actors' name list
     for (let movie of data1) {
       const spreadSheet: SpreadSheet = {
         Title: movie.Title,
