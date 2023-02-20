@@ -66,7 +66,7 @@ export const getMovieIds = (search: string, page: number) => {
   );
 };
 
-export const getMovieDetail = (id: string, fetchActors: boolean = false) => {
+export const getMovieDetail = (id: string, withActors: boolean = false) => {
   return new Promise<Movie>((resolve, reject) => {
     try {
       fetch(`${OMDB_URL}&i=${id}`, {
@@ -84,7 +84,7 @@ export const getMovieDetail = (id: string, fetchActors: boolean = false) => {
                 Image: data.Poster,
                 Year: data.Year,
               } as Movie;
-              if (fetchActors) {
+              if (withActors) {
                 movie.Actors = data.Actors.split(",").map((value: string) => {
                   return value.trim();
                 });

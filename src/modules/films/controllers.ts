@@ -10,7 +10,10 @@ import {
   getMovieIds,
 } from "./service";
 
-const searchMoviePromises = async (search: string) => {
+const searchMoviePromises = async (
+  search: string,
+  withActors: boolean = false
+) => {
   let page = 1;
   let PAGE_SIZE = 100;
   let moviePromises: Array<Promise<Movie>> = [];
@@ -20,7 +23,7 @@ const searchMoviePromises = async (search: string) => {
     const data = await getMovieIds(search, page);
     moviePromises.push(
       ...data.ids.map((id) => {
-        return getMovieDetail(id);
+        return getMovieDetail(id, withActors);
       })
     );
     PAGE_SIZE = data.pageCount;
@@ -75,11 +78,11 @@ export const spreadSheet = async (
 
   try {
     // Fetch all detail from first movies list
-    let moviePromises = await searchMoviePromises(title1);
+    let moviePromises = await searchMoviePromises(title1, true);
     const data1 = await Promise.all(moviePromises);
 
     // Fetch all actors from second movies list
-    moviePromises = await searchMoviePromises(title2);
+    moviePromises = await searchMoviePromises(title2, true);
     const data2 = await Promise.all(moviePromises);
     const actors2: Array<string> = [];
     for (let movie of data2) {
